@@ -10,6 +10,7 @@ qt_standard_project_setup(REQUIRES 6.8)
 
 qt_add_executable(appQtTex_Gen
     main.cpp
+    core/core.h
     core/AnkiCard.cpp
     core/AnkiCard.h
     core/CardParser.cpp
@@ -18,6 +19,8 @@ qt_add_executable(appQtTex_Gen
     core/FileHander.h
     core/LatexConverter.cpp
     core/LatexConverter.h
+    controller/AppController.cpp
+    controller/AppController.h
 )
 
 qt_add_qml_module(appQtTex_Gen

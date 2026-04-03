@@ -4,16 +4,16 @@
 
 QString CLatexConverter::convertToAnkiLatex(const QString& text)
 {
-	// 1. 定义正则表达式 (使用原始字符串 R"(...)" 避免繁琐的转义)
-	// 格式：(填空公式)|(普通公式)
-	// 分组名与 Python 脚本保持一致：cloze_num, cloze_math, plain_math
-	QString pattern = R"((\{\{c(?<cloze_num>\d+)::\$(?<cloze_math>.*?)\$\}\})|(\$(?<plain_math>.*?)\$))";
+	// 1. 让正则匹配任意填空 {{c1::...}} ，不再强求里面必须有 $
+	// 重点修复：使用 \}\}(?!\}) 负向先行断言。
+	// 这意味着当遇到多个 } 连在一起时（如 AI 输出的 }}}}），正则不会在第一个 }} 处停下，
+	// 而是会一直匹配到最后两个不被 } 跟随的 }}，完美提取出完整的公式！
+	QString pattern = R"((\{\{c(?<cloze_num>\d+)::(?<cloze_content>.*?)\}\}(?!\}))|(\$(?<plain_math>.*?)\$))";
 
 	QRegularExpression re(pattern);
 	QString output;
 	int lastPos = 0;
 
-	// 2. 使用迭代器模拟 Python 的 re.sub 回调逻辑
 	auto it = re.globalMatch(text);
 	while (it.hasNext()) {
 		QRegularExpressionMatch match = it.next();
@@ -21,16 +21,31 @@ QString CLatexConverter::convertToAnkiLatex(const QString& text)
 		// 将匹配项之前的普通文本加入结果
 		output.append(text.mid(lastPos, match.capturedStart() - lastPos));
 
-		// 3. 逻辑判断：是填空公式还是普通公式
-		QString clozeMath = match.captured("cloze_math");
-		if (!clozeMath.isEmpty()) {
-			// --- 处理填空类公式 {{c1::$...$}} ---
+		QString clozeContent = match.captured("cloze_content");
+		if (!clozeContent.isEmpty()) {
+			// --- 处理填空 ---
 			QString num = match.captured("cloze_num");
 
-			// 调用辅助函数处理 }} 冲突
-			QString fixedMath = fixBraceCollision(clozeMath);
+			// AI 可能会多加多余的空格或 $, 先清理掉
+			clozeContent = clozeContent.trimmed();
+			if (clozeContent.startsWith("$") && clozeContent.endsWith("$")) {
+				clozeContent = clozeContent.mid(1, clozeContent.length() - 2);
+			}
 
-			output.append(QString("{{c%1::[$]%2[/$]}}").arg(num, fixedMath));
+			// 判断内容是不是公式？包含 \ 或者 ^ 或者 _ 或者多于两个字母，大概率是公式
+			bool isMath = clozeContent.contains('\\') || clozeContent.contains('^') ||
+				clozeContent.contains('_') || clozeContent.contains(QRegularExpression("[a-zA-Z]{2,}"));
+
+			clozeContent = fixBraceCollision(clozeContent);
+
+			if (isMath) {
+				// 如果是公式，包裹成 Anki 公式
+				output.append(QString("{{c%1::[$]%2[/$]}}").arg(num, clozeContent));
+			}
+			else {
+				// 如果只是纯文字 (比如 {{c1::奇函数}})
+				output.append(QString("{{c%1::%2}}").arg(num, clozeContent));
+			}
 		}
 		else {
 			// --- 处理普通公式 $...$ ---
@@ -41,16 +56,18 @@ QString CLatexConverter::convertToAnkiLatex(const QString& text)
 		lastPos = match.capturedEnd();
 	}
 
-	// 4. 加入最后一段文本
 	output.append(text.mid(lastPos));
+
+	// 额外清扫：AI 若输出 "$y = $ {{c1::...}}" 这种错误格式，把独立落单的 $ 强行修复
+	// 这里通过简单的 replace 处理两个相邻公式或残留 $ 的格式问题
+	output.replace("[$] [/$]", " ");
+	output.replace("$ {{", "{{");
 
 	return output;
 }
 
 QString CLatexConverter::fixBraceCollision(QString math)
 {
-	// 文档建议：必须增加一个循环替换步骤，将捕获到的公式字符串内部所有的 }} 替换为 } }
-	// 这是为了防止 LaTeX 的闭合括号与 Anki 填空标签 }} 产生解析冲突
 	while (math.contains("}}")) {
 		math.replace("}}", "} }");
 	}

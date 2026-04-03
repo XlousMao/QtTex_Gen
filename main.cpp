@@ -1,11 +1,18 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include "controller/AppController.h"
+
 
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
 
     QQmlApplicationEngine engine;
+
+    AppController appController;
+    engine.rootContext()->setContextProperty("appController", &appController);
+
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,

@@ -1,3 +1,6 @@
+#ifndef ANKICARD_H
+#define ANKICARD_H
+
 #include <QString>
 
 
@@ -33,3 +36,6 @@ private:
 	QString m_BackExtra{};  // 背面额外
 	QString m_tags{};//标签
 };
+
+
+#endif // ANKICARD_H
