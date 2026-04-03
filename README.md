@@ -1,69 +1,107 @@
-# Anki Math Card Converter (QtTex_Gen) - v1.0
+<div align="center">
 
-![C++](https://img.shields.io/badge/C%2B%2B-17-blue.svg)
-![Qt](https://img.shields.io/badge/Qt-6.8-41CD52.svg)
-![CMake](https://img.shields.io/badge/CMake-3.16+-brightgreen.svg)
+# 🚀 QtTex_Gen (Anki Math Card Converter) v2.0
 
-Anki Math Card Converter (QtTex_Gen) 是一款基于 **C++ / Qt(QML)** 开发的桌面轻量级工具。它专门用于解决**将大语言模型（AI）按固定格式生成的包含大量数学公式的 Markdown 文本，自动提取并转换成完美兼容 Anki 的 `[$]公式[/$]` 格式卡片**的问题。
+**极致优雅的 Markdown -> Anki 数学/理科闪卡自动化构建工具**
 
-有了它的帮助，你可以直接拍摄书本发送给大语言模型（如 ChatGPT / Claude / Gemini），将生成的文本粘贴进本地 `.md` 文件，然后使用本软件一键转换，并直接粘贴到 Anki 即可开始高效复习！
+![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg?style=flat-square&logo=c%2B%2B)
+![Qt6](https://img.shields.io/badge/Qt-6.8-41CD52.svg?style=flat-square&logo=qt)
+![CMake](https://img.shields.io/badge/CMake-3.16+-064F8C.svg?style=flat-square&logo=cmake)
+![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)
 
-## 🌟 核心痛点与功能
+</div>
 
-- **痛点**：Anki 填空卡片的闭合标签 `}}` 与 LaTeX 中大量使用的右大括号（如 `\frac{1}{x^2}}`）经常会产生解析渲染冲突（Parser Collision）。此外，Anki 必须使用 `[$]...[/$]` 代替普通的 `$...$` 才能在所有设备上正确渲染免编译的 MathJax 公式。
-- **核心功能**：
-  - **自动处理大模型的不稳定输出**：超强容错的正则表达式（兼容缺少 `$`、缺少星号、错误换行等情况），无需频繁手工修正模型输出。
-  - **智能识别数学公式**：通过分析填空内是否包含特殊的数学符号（如 `\`、`^` 等），智能区分纯文字填空与公式填空。
-  - **解决公式冲突**：自动插入空格解决 `}}` 与 LaTeX 发生的灾难性碰撞（自动替换为 `} }`），确保 Anki 顺利渲染。
-  - **优雅的 QML UI 交互**：左右双栏实时预览，处理了多少张卡片一目了然。
+## 🌟 项目简介
 
-## 📸 界面预览
+**QtTex_Gen** 是一款专为理科生、医学生及高级 Anki 玩家打造的开源桌面软件。它的核心使命是：**将 AI（如 Gemini、ChatGPT、Claude）生成的包含复杂 LaTeX 公式的 Markdown 笔记，一键极速转化为完美的 Anki 填空卡（Cloze）并直接跨进程无缝写入 Anki 数据库。**
 
-- 左侧载入由大模型生成的原始 `.md` 内容。
-- 点击抢眼的蓝色按钮 **Convert LaTeX (to Anki)**
-- 右侧即刻生成完全契合 Anki 导入与渲染要求的内容！
+不再需要繁琐的复制粘贴，不再面临 Anki 渲染 `\frac{}` 时与双大括号 `{{ }}` 冲突导致报错退出的恶心体验！
 
-## 🚀 推荐的最佳 AI 提示词 (Prompt)
-为确保程序以最高精度提取卡片数据，扫描笔记并发送给大语言模型时请附带这套经过严格测试的 Prompt：
+### 🔥 v2.0 重磅升级史诗级特性
+1. **AnkiConnect 原生集成**：完全抛弃中转文本！现在基于 HTTP JSON RPC 直接与后台 Anki 进程通信，自动拉取你的**全量牌组**、**卡片模板**与**字段清单**，实现真正的**一键制卡**！
+2. **全新 Clash-Verge 风格 UI**：重构了 QML 界面，采用极简浅灰背景、现代化悬浮白净面板、悬停过渡动效，享受视觉与体验的双重愉悦。
+3. **高并发与自动排错**：基于 `QNetworkAccessManager` 的异步网络流处理，全自动容错（空字段补全、去重拦截提示）。
+
+---
+
+## ✨ 核心特性
+
+- 🧠 **AI 友好型解析引擎**：无论是 `**文字：**` 还是带有额外空格的落单 `$` 符号，C++ 正则引擎都能精确提取正面、背面和标签。
+- 🛡️ **大括号防碰撞 (Brace Collision Fix)**：独创算法，精准切割 `{{c1:: ... }}` 填空符与深层嵌套的 LaTeX 语法，确保 `\frac{e^x}{2}` 这类公式在 Anki 中被完美渲染。
+- ⚡ **现代化 C++ & Qt6 架构**：
+  - **后端**：纯 C++17 编写，极速解析。使用 `AnkiConnect` 类接管底层网络通信封装。
+  - **中间层**：`AppController` 采用 MVC 模式的信号槽机制，与 QML UI 高效桥接。
+  - **前端**：Qt Quick / QML 构建，响应式分栏布局。
+
+---
+
+## 🛠️ 项目架构
 
 ```text
-请帮我分析图片的数学/专业课知识点，提取出高频考点、定理公式、二级结论或易错陷阱，并帮我制作成 Anki 记忆卡片。
-
-【严格的输出格式限制】
-为了方便我使用正则解析程序，请你务必绝对遵守以下 Markdown 输出格式。
-1. 不要输出任何开场白或废话，直接输出卡片内容。
-2. 卡片之间必须使用独立的 `---` 分隔。
-3. 必须严格使用 `**文字：**`、`**背面额外：**`、`**标签：**` 作为每一项的开头。
-4. 所有的数学公式必须使用 `$公式内容$` 包裹。如果正面需要作为填空题，请使用 `{{c1::$挖空公式$}}`。
-
-【卡片结构模板】
-**文字：** [正面提问或带填空的定理]
-**背面额外：** [原理解释或留空]
-**标签：** [填写标签，例如：数学::微积分]
+📦 QtTex_Gen
+ ┣ 📂 AnkiConnect    # (v2.0+) 基于 QNetworkAccessManager 的 JSON RPC 网络通信库
+ ┣ 📂 controller     # AppController: 连接 C++ 核心业务与 QML UI 的桥梁
+ ┣ 📂 core           # 核心引擎: CCardParser(正则切割), CLatexConverter(公式包裹与冲突修复)
+ ┣ 📂 ui             # MainWindow.qml 等全新前端界面代码
+ ┗ 📜 CMakeLists.txt # 现代 CMake 脚本（支持自动提取 Qt 部署库 windeployqt）
 ```
 
-## 🏗️ 架构与技术栈
-项目采用了经典的 **MVC / MVVM 架构**：
-- `UI`：使用 **QML** 编写（基于 Qt Quick Controls），实现了响应式与布局隔离。
-- `Controller`：一个暴露了 `Q_INVOKABLE` 的 C++ 中间层 `AppController`。
-- `Core`：三个纯业务逻辑的 C++ 类（不依赖任何界面控件，极其容易移植或单测）：
-  - `CardParser`：MD 文本切割与信息提取，通过强大正则处理杂乱文本。
-  - `LatexConverter`：完成最核心的正则挖掘、格式纠错、括号分离功能。
-  - `FileHandler`：单纯隔离 QIODevice 读写逻辑。
+---
 
-## 🛠️ 编译与运行
-依赖环境：
-- `CMake 3.16+`
-- `Qt 6.8+` (包含 Qt Quick / QML 模块)
-- `C++17`
+## 📝 支持的 Markdown 输入格式要求
 
-在根目录下使用 CMake 即可一键拉起（也支持在 VS 或 QtCreator 中打开 `CMakeLists.txt`）：
+使用 AI 生成笔记时，请让 AI 输出如下标准格式（不同的卡片之间用 `---` 隔开）：
+
+```markdown
+文字： 悬链线方程（取 $a=1$ 时）的表达式为 $y = $ {{c1::\frac{e^x + e^{-x}}{2}}}，它是一个 {{c2::偶}} 函数。
+
+背面额外： 该函数又被称为双曲余弦函数 $\cosh x$，在物理中常用于描述两端固定的均匀柔性链条。
+
+标签： 数学::函数性质
+---
+文字： 极限 $\lim_{x \to \infty} e^x$ 的结果是 {{c1::不存在}}。
+
+背面额外： 【易错陷阱】必须区分趋向，方向不同结果不同。
+
+标签： 数学::高数
+```
+
+---
+
+## ⚡ 快速开始
+
+### 1. 准备环境
+- **安装 Anki 及 插件**：在你的 Anki 中安装 **AnkiConnect** 插件 (代码: `2055492159`)。保持 Anki 处于打开状态。
+- **配置 AnkiConnect** (可选但推荐): 在插件设置中允许你的应用访问（通常默认 `127.0.0.1` 即可）。
+
+### 2. 编译本项目
 ```bash
+git clone https://github.com/yourusername/QtTex_Gen.git
+cd QtTex_Gen
 mkdir build && cd build
-cmake ..
+cmake -G Ninja ..
 cmake --build .
 ```
+*(注：Windows 环境下 CMake 会自动调用 `windeployqt` 将所需依赖拷贝至同目录，做到即编即用！)*
 
-## 📅 下一步计划 (Roadmap V2.0)
-- 一对多直接通信：接入 AnkiConnect 原生 API，去除使用剪贴板与中间 md 文件的中转过程，实现文本解析完毕后静默插入 Anki 牌组的终极自动化体验。
-- 增加文件的快速拖拽 (Drag & Drop) 支持。
+### 3. 开始制卡
+1. 启动软件，你会立刻看到右侧日志显示 **`>>> [API] Connected to Anki Connect.`**，并且自动拉取了你的牌组。
+2. 点击 **Play Open MD File** 加载你准备好的 Markdown 笔记。
+3. 从下拉菜单选择**目标牌组 (Deck)** 和 **卡片模板 (Model)**（推荐使用“填空题”或“Cloze”模板）。
+4. 点击闪亮的蓝底按钮 **Import directly to Anki**，不到一秒钟，数十张满载华丽 LaTeX 公式的卡片已经躺在你的 Anki 复习列队中！
+
+---
+
+## 📈 Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/QtTex_Gen&type=Date)](https://star-history.com/#yourusername/QtTex_Gen&Date)
+
+> **小提示**：如果你喜欢这个项目，欢迎点击右上角的 ⭐ **Star**！你的支持是我更新和维护的最大动力！
+
+---
+
+## 🤝 贡献与反馈
+有任何绝妙的 Idea 或者大 Bug？欢迎提 Issue 或 Pull Request！我们非常乐意合并让应用变得更好用的代码。
+
+## 📜 许可证 (License)
+本项目遵守 [MIT License](LICENSE) 开源协议。你可以自由地将其用于你的个人学习流、整合甚至二次开发。
