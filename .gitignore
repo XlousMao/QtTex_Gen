@@ -33,7 +33,6 @@ CMakeLists.txt.user.*
 *.qm
 moc/
 obj/
-ui/
 rcc/
 *.moc
 moc_*.cpp
@@ -72,3 +71,4 @@ ui_*.h
 .Trashes
 ehthumbs.db
 Thumbs.db
+/Project_Architecture.md
