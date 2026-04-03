@@ -10,29 +10,18 @@ public:
 		, m_tags(tags)
 	{
 	}
-	CAnkiCard(const CAnkiCard& another)
-		: m_FrontText(another.m_FrontText)
-		, m_BackExtra(another.m_BackExtra)
-		, m_tags(another.m_tags)
-	{
-	}
-	CAnkiCard& operator=(const CAnkiCard& another)
-	{	
-		if (this == &another) {
-			return *this;
-		}
-		m_tags = another.m_tags;
-		m_FrontText = another.m_FrontText;
-		m_BackExtra = another.m_BackExtra;
-		return *this;
-	}
+	CAnkiCard(const CAnkiCard& another) = default;
+	CAnkiCard& operator=(const CAnkiCard& another) = default;
 	
-	QString toString() 
+	QString toString() const 
 	{
-		//Todo:将单个卡片的这三个内容按特定格式组成一个字符串，方便后续保存到文件中
+		return QString("**文字：** %1\n\n**背面额外：** %2\n\n**标签：** %3\n")
+			.arg(m_FrontText)
+			.arg(m_BackExtra)
+			.arg(m_tags);
 	};
 
-private:
+public:
 	QString GetFrontText() const { return m_FrontText; }
 	QString GetBackExtra() const { return m_BackExtra; }
 	QString GetTags() const { return m_tags; }
