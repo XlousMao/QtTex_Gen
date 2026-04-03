@@ -6,6 +6,7 @@ AppController::AppController(QObject* parent /*= nullptr*/)
 	: QObject(parent)
 	, m_currentRawText()
 	, m_processedText()
+	, m_ankiConnect(new AnkiConnect(this)) // 实例化 AnkiConnect 处理器，设置 AppController 为其父对象以自动管理内存
 {
 
 }
@@ -70,5 +71,43 @@ void AppController::saveResultFile(const QString& fileUrl)
 	{
 		emit errorMessage("文件保存失败，请检查路径和权限。");
 	}
+}
+
+// -------------------- AnkiConnect 桥接部分 --------------------
+
+void AppController::checkAnkiConnection()
+{
+	// 调用 m_ankiConnect 的 checkConnection 方法。
+	// 这里传递了一个 Lambda 表达式，当获取到结果后它会被调用。
+	// [this] 表示我们要在这个匿名函数里面使用当前 AppController 的函数和成员（比如 emit）。
+	m_ankiConnect->checkConnection([this](bool success, int version) {
+		// 发送信号给 QML（前端收到此信号后就可以弹出 Toast 提示等）
+		emit ankiConnectionChecked(success, version);
+	});
+}
+
+void AppController::fetchDeckNames()
+{
+	m_ankiConnect->getDeckNames([this](bool success, const QStringList& decks) {
+		emit ankiDeckNamesFetched(success, decks);
+	});
+}
+
+void AppController::fetchModelNames()
+{
+	m_ankiConnect->getModelNames([this](bool success, const QStringList& models) {
+		emit ankiModelNamesFetched(success, models);
+	});
+}
+
+void AppController::addCardToAnki(const QString& deckName, 
+                                  const QString& modelName, 
+                                  const QString& frontField, const QString& frontContent, 
+                                  const QString& backField, const QString& backContent)
+{
+	m_ankiConnect->addNote(deckName, modelName, frontField, frontContent, backField, backContent, 
+		[this](bool success, const QString& errorMsg) {
+			emit ankiNoteAdded(success, errorMsg);
+		});
 }
 

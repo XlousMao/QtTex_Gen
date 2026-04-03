@@ -4,7 +4,7 @@ project(QtTex_Gen VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick)
+find_package(Qt6 REQUIRED COMPONENTS Quick Network)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
@@ -21,6 +21,8 @@ qt_add_executable(appQtTex_Gen
     core/LatexConverter.h
     controller/AppController.cpp
     controller/AppController.h
+    AnkiConnect/AnkiConnect.cpp
+    AnkiConnect/AnkiConnect.h
 )
 
 qt_add_qml_module(appQtTex_Gen
@@ -41,7 +43,7 @@ set_target_properties(appQtTex_Gen PROPERTIES
 )
 
 target_link_libraries(appQtTex_Gen
-    PRIVATE Qt6::Quick
+    PRIVATE Qt6::Quick Qt6::Network
 )
 
 # 自动调用 windeployqt 将所需的 Qt 运行库和插件拷贝到 exe 所在目录

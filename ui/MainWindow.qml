@@ -11,6 +11,11 @@ ApplicationWindow  {
     height: 600
     title: qsTr("Anki Math Card Converter (QtTex_Gen)")
 
+    // 页面加载完成后自动执行
+    Component.onCompleted: {
+        appController.checkAnkiConnection()
+    }
+
     // 1. 定义打开文件对话框
     FileDialog {
         id: fileDialog
@@ -90,10 +95,40 @@ ApplicationWindow  {
 
 
     //底部：状态栏
-    footer: Label {
-        id: statusLabel
-        text: "Ready | 0 Cards Detected"
-        padding: 5
+   footer: ToolBar {
+        // 使用 RowLayout 来实现水平排列
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+
+            // 左侧：状态标签 (保持 id 为 statusLabel，以便 Connections 继续工作)
+            Label {
+                id: statusLabel
+                text: "Ready | 0 Cards Detected"
+                color: "black" 
+            }
+
+            // 【弹簧】：这个 Item 会占据所有剩余的中间空间
+            Item {
+                Layout.fillWidth: true
+            }
+
+            // 右侧：新增的文本信息
+            Label {
+                id: rightInfoLabel
+                text: "Anki Math Converter v2.0"
+                font.italic: true
+                color: "green"
+            }
+
+            Label {
+                id: rightInfoLabe2
+                text: "未连接到 Anki (请确保 Anki 运行并安装 AnkiConnect)"
+                font.italic: true
+                color: "black"
+            }
+        }
     }
 
      // ===================================
@@ -103,5 +138,13 @@ ApplicationWindow  {
         function onFileLoaded(rawContent) { leftTextArea.text = rawContent; }
         function onProcessCompleted(resultText) { rightTextArea.text = resultText; }
         function onErrorMessage(msg) { statusLabel.text = msg; }
+
+        function onAnkiConnectionChecked(success, version) {
+            if (success) {
+                rightInfoLabe2.text = "已连接到 Anki (版本 " + version + ")";
+                rightInfoLabe2.color = "red";
+                // 可以在这里继续调用 appController.fetchDeckNames() 等
+            } 
+        }
     }
 }
