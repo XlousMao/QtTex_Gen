@@ -4,62 +4,96 @@
 
 QString CLatexConverter::convertToAnkiLatex(const QString& text)
 {
-	// 1. 让正则匹配任意填空 {{c1::...}} ，不再强求里面必须有 $
-	// 重点修复：使用 \}\}(?!\}) 负向先行断言。
-	// 这意味着当遇到多个 } 连在一起时（如 AI 输出的 }}}}），正则不会在第一个 }} 处停下，
-	// 而是会一直匹配到最后两个不被 } 跟随的 }}，完美提取出完整的公式！
-	QString pattern = R"((\{\{c(?<cloze_num>\d+)::(?<cloze_content>.*?)\}\}(?!\}))|(\$(?<plain_math>.*?)\$))";
-
-	QRegularExpression re(pattern);
 	QString output;
-	int lastPos = 0;
-
-	auto it = re.globalMatch(text);
-	while (it.hasNext()) {
-		QRegularExpressionMatch match = it.next();
-
-		// 将匹配项之前的普通文本加入结果
-		output.append(text.mid(lastPos, match.capturedStart() - lastPos));
-
-		QString clozeContent = match.captured("cloze_content");
-		if (!clozeContent.isEmpty()) {
-			// --- 处理填空 ---
-			QString num = match.captured("cloze_num");
-
-			// AI 可能会多加多余的空格或 $, 先清理掉
-			clozeContent = clozeContent.trimmed();
-			if (clozeContent.startsWith("$") && clozeContent.endsWith("$")) {
-				clozeContent = clozeContent.mid(1, clozeContent.length() - 2);
-			}
-
-			// 判断内容是不是公式？包含 \ 或者 ^ 或者 _ 或者多于两个字母，大概率是公式
-			bool isMath = clozeContent.contains('\\') || clozeContent.contains('^') ||
-				clozeContent.contains('_') || clozeContent.contains(QRegularExpression("[a-zA-Z]{2,}"));
-
-			clozeContent = fixBraceCollision(clozeContent);
-
-			if (isMath) {
-				// 如果是公式，包裹成 Anki 公式
-				output.append(QString("{{c%1::[$]%2[/$]}}").arg(num, clozeContent));
-			}
-			else {
-				// 如果只是纯文字 (比如 {{c1::奇函数}})
-				output.append(QString("{{c%1::%2}}").arg(num, clozeContent));
-			}
+	int n = text.length();
+	int pos = 0;
+	
+	while (pos < n) {
+		int idxB = text.indexOf("{{c", pos);
+		int idxD = text.indexOf("$", pos);
+		
+		if (idxB == -1 && idxD == -1) {
+			output.append(text.mid(pos));
+			break;
 		}
-		else {
-			// --- 处理普通公式 $...$ ---
-			QString plainMath = match.captured("plain_math");
-			output.append(QString("[$]%1[/$]").arg(plainMath));
+		
+		int firstIdx = -1;
+		bool isCloze = false;
+		if (idxB != -1 && idxD != -1) {
+			if (idxB < idxD) { firstIdx = idxB; isCloze = true; }
+			else { firstIdx = idxD; isCloze = false; }
+		} else if (idxB != -1) {
+			firstIdx = idxB; isCloze = true;
+		} else {
+			firstIdx = idxD; isCloze = false;
 		}
-
-		lastPos = match.capturedEnd();
+		
+		output.append(text.mid(pos, firstIdx - pos));
+		pos = firstIdx;
+		
+		if (isCloze) {
+			int p = firstIdx + 3;
+			QString numStr;
+			while (p < n && text[p].isDigit()) {
+				numStr += text[p];
+				p++;
+			}
+			if (p < n - 2 && text[p] == ':' && text[p+1] == ':' && !numStr.isEmpty()) {
+				p += 2;
+				int braceCount = 2;
+				int startContent = p;
+				while (p < n) {
+					if (text[p] == '{') {
+						braceCount++;
+					} else if (text[p] == '}') {
+						braceCount--;
+						if (braceCount == 0 && p > 0 && text[p-1] == '}') {
+							break;
+						}
+					}
+					p++;
+				}
+				if (braceCount == 0 && p > 0 && text[p-1] == '}') {
+					QString clozeContent = text.mid(startContent, p - 1 - startContent);
+					pos = p + 1;
+					
+					clozeContent = clozeContent.trimmed();
+					if (clozeContent.startsWith("$") && clozeContent.endsWith("$")) {
+						clozeContent = clozeContent.mid(1, clozeContent.length() - 2);
+					}
+					
+					bool isMath = clozeContent.contains('\\') || clozeContent.contains('^') ||
+						clozeContent.contains('_') || clozeContent.contains(QRegularExpression("[a-zA-Z]{2,}"));
+					
+					clozeContent = fixBraceCollision(clozeContent);
+					
+					if (isMath) {
+						output.append(QString("{{c%1::[$]%2[/$]}}").arg(numStr, clozeContent));
+					}
+					else {
+						output.append(QString("{{c%1::%2}}").arg(numStr, clozeContent));
+					}
+				} else {
+					output.append(text.mid(firstIdx, 3));
+					pos = firstIdx + 3;
+				}
+			} else {
+				output.append(text.mid(firstIdx, 3));
+				pos = firstIdx + 3;
+			}
+		} else {
+			int endD = text.indexOf("$", pos + 1);
+			if (endD != -1) {
+				QString plainMath = text.mid(pos + 1, endD - pos - 1);
+				output.append(QString("[$]%1[/$]").arg(plainMath));
+				pos = endD + 1;
+			} else {
+				output.append("$");
+				pos++;
+            }
+		}
 	}
 
-	output.append(text.mid(lastPos));
-
-	// 额外清扫：AI 若输出 "$y = $ {{c1::...}}" 这种错误格式，把独立落单的 $ 强行修复
-	// 这里通过简单的 replace 处理两个相邻公式或残留 $ 的格式问题
 	output.replace("[$] [/$]", " ");
 	output.replace("$ {{", "{{");
 

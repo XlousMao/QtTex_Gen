@@ -44,6 +44,19 @@ target_link_libraries(appQtTex_Gen
     PRIVATE Qt6::Quick
 )
 
+# 自动调用 windeployqt 将所需的 Qt 运行库和插件拷贝到 exe 所在目录
+if(WIN32)
+    get_target_property(_qmake_executable Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(_qt_bin_dir "${_qmake_executable}" DIRECTORY)
+    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${_qt_bin_dir}")
+    if(WINDEPLOYQT_EXECUTABLE)
+        add_custom_command(TARGET appQtTex_Gen POST_BUILD
+            COMMAND "${WINDEPLOYQT_EXECUTABLE}" --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/ui" "$<TARGET_FILE:appQtTex_Gen>"
+            COMMENT "Running windeployqt to copy Qt dependencies..."
+        )
+    endif()
+endif()
+
 include(GNUInstallDirs)
 install(TARGETS appQtTex_Gen
     BUNDLE DESTINATION .
