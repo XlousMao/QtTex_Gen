@@ -25,12 +25,16 @@ public:
     
     // 3. 获取能够使用的所有笔记模板(模型)
     void getModelNames(std::function<void(bool success, const QStringList& models)> callback);
+
+    // 3.1 获取某个模板的字段名（用于前后字段映射）
+    void getModelFieldNames(const QString& modelName, std::function<void(bool success, const QStringList& fieldNames, const QString& errorMsg)> callback);
     
     // 4. 发送新建笔记请求
     void addNote(const QString& deckName, 
                  const QString& modelName, 
                  const QString& frontField, const QString& frontContent, 
                  const QString& backField, const QString& backContent, 
+                 const QStringList& tags,
                  std::function<void(bool success, const QString& errorMsg)> callback);
 
 private:

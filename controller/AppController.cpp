@@ -1,5 +1,25 @@
 #include "AppController.h"
 #include <QUrl>
+#include <QRegularExpression>
+#include <memory>
+
+namespace {
+QStringList parseTags(const QString& rawTags)
+{
+	QString normalized = rawTags;
+   normalized.replace(QString::fromUtf8("，"), " ");
+	normalized.replace(',', ' ');
+	normalized.replace(';', ' ');
+   normalized.replace(QString::fromUtf8("；"), " ");
+
+	QStringList tags = normalized.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+	for (QString& t : tags) {
+		t = t.trimmed();
+	}
+	tags.removeAll(QString());
+	return tags;
+}
+}
 
 
 AppController::AppController(QObject* parent /*= nullptr*/)
@@ -100,14 +120,91 @@ void AppController::fetchModelNames()
 	});
 }
 
+void AppController::fetchModelFieldNames(const QString& modelName)
+{
+	m_ankiConnect->getModelFieldNames(modelName, [this](bool success, const QStringList& fieldNames, const QString& errorMsg) {
+		emit ankiModelFieldNamesFetched(success, fieldNames, errorMsg);
+	});
+}
+
 void AppController::addCardToAnki(const QString& deckName, 
                                   const QString& modelName, 
                                   const QString& frontField, const QString& frontContent, 
                                   const QString& backField, const QString& backContent)
 {
 	m_ankiConnect->addNote(deckName, modelName, frontField, frontContent, backField, backContent, 
+     QStringList(),
 		[this](bool success, const QString& errorMsg) {
 			emit ankiNoteAdded(success, errorMsg);
 		});
+}
+
+void AppController::importCardsToAnki(const QString& deckName, 
+                                      const QString& modelName,
+                                      const QString& frontField, 
+                                      const QString& backField)
+{
+	if(m_currentRawText.isEmpty()){
+		emit errorMessage("无法导入：没有加载内容！");
+		return;
+	}
+
+	CAnkiCardParser parser;
+	QList<CAnkiCard> cards = parser.parseMarkdown(m_currentRawText);
+
+	if(cards.isEmpty()) {
+		emit errorMessage("未检测到任何卡片，无法导入。");
+		return;
+	}
+
+	emit errorMessage(QString("开始导入 %1 张卡片...").arg(cards.size()));
+
+	auto completedCount = std::make_shared<int>(0);
+	auto successCount = std::make_shared<int>(0);
+	const int totalCount = cards.size();
+
+	for (int i = 0; i < cards.size(); ++i) {
+		CAnkiCard card = cards[i];
+
+		// 转换 LaTeX (注意，如果没文字可能会被 AnkiConnect 拦截并判定 empty, 确保传入的不是完全空字符串)
+		QString front = CLatexConverter::convertToAnkiLatex(card.GetFrontText());
+		QString back = CLatexConverter::convertToAnkiLatex(card.GetBackExtra());
+		QStringList tags = parseTags(card.GetTags());
+
+		// 处理有些卡片背面额外区域可能为空，但 Anki 要求字段不能是 null 或者不提供（某些模板可能因为其中一个必填而报错）
+		if (front.trimmed().isEmpty()) front = " ";
+		if (back.trimmed().isEmpty()) back = " ";
+
+		// 因为网络请求是异步的，我们在 lambda 当中用卡片序号来输出日志记录
+       m_ankiConnect->addNote(deckName, modelName, frontField, front, backField, back, tags,
+			[this, i, frontField, backField, completedCount, successCount, totalCount](bool success, const QString& errorMsg) {
+				if (success) {
+                  (*successCount)++;
+					// Add note 的 result 为新笔记的 ID，这里不记录了，直接发信号提示单张卡片成功
+					emit ankiNoteAdded(true, QString("Card %1 导入成功").arg(i + 1));
+				} else {
+                   QString lower = errorMsg.toLower();
+					if (lower.contains("duplicate")) {
+						emit ankiNoteAdded(false, QString("Card %1 跳过：检测到重复笔记 [%2]").arg(i + 1).arg(errorMsg));
+					}
+					else if (lower.contains("empty")) {
+						emit ankiNoteAdded(false, QString("Card %1 导入失败 [%2] \n  (检查选中的 Model 是否真的有 '%3' 和 '%4' 这两个字段)").arg(i + 1).arg(errorMsg).arg(frontField).arg(backField));
+					}
+					else {
+						emit ankiNoteAdded(false, QString("Card %1 导入失败 [%2]").arg(i + 1).arg(errorMsg));
+					}
+				}
+
+				(*completedCount)++;
+				if (*completedCount == totalCount) {
+					int failed = totalCount - *successCount;
+					if (failed == 0) {
+						emit errorMessage(QString("导入完成：%1 张卡片成功！").arg(*successCount));
+					} else {
+						emit errorMessage(QString("导入完成：成功 %1，失败 %2（共 %3）").arg(*successCount).arg(failed).arg(totalCount));
+					}
+				}
+			});
+	}
 }
 

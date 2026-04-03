@@ -28,10 +28,15 @@ public:
 	Q_INVOKABLE void checkAnkiConnection();
 	Q_INVOKABLE void fetchDeckNames();
 	Q_INVOKABLE void fetchModelNames();
+ Q_INVOKABLE void fetchModelFieldNames(const QString& modelName);
 	Q_INVOKABLE void addCardToAnki(const QString& deckName,
 	                               const QString& modelName,
 	                               const QString& frontField, const QString& frontContent,
 	                               const QString& backField, const QString& backContent);
+	Q_INVOKABLE void importCardsToAnki(const QString& deckName, 
+	                                   const QString& modelName,
+	                                   const QString& frontField, 
+	                                   const QString& backField);
 
 signals:
 	// C++ 处理完后，发送信号通知 QML 更新界面文本
@@ -43,6 +48,7 @@ signals:
 	void ankiConnectionChecked(bool success, int version);
 	void ankiDeckNamesFetched(bool success, const QStringList& decks);
 	void ankiModelNamesFetched(bool success, const QStringList& models);
+  void ankiModelFieldNamesFetched(bool success, const QStringList& fieldNames, const QString& errorMsg);
 	void ankiNoteAdded(bool success, const QString& errorMsg);
 
 private:
@@ -54,6 +60,11 @@ private:
 };
 
 #endif // APPCONTROLLER_H
+
+
+
+
+
 
 
 

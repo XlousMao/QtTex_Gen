@@ -6,6 +6,10 @@
 #include <QDebug>
 #include <QUrl>
 
+namespace {
+    constexpr int kAnkiApiVersion = 5;
+}
+
 AnkiConnect::AnkiConnect(QObject *parent) 
     : QObject(parent), m_networkManager(new QNetworkAccessManager(this))
 {
@@ -76,7 +80,7 @@ void AnkiConnect::sendRequest(const QString& action, int version, const QJsonObj
 void AnkiConnect::checkConnection(std::function<void(bool, int)> callback)
 {
     // 抛弃所有的参数为空的 QJsonObject() 给 sendRequest
-    sendRequest("version", 6, QJsonObject(), [callback](const QJsonValue& result, const QString& error) {
+    sendRequest("version", kAnkiApiVersion, QJsonObject(), [callback](const QJsonValue& result, const QString& error) {
         if (!error.isEmpty() || !result.isDouble()) {
             callback(false, 0);
         } else {
@@ -87,7 +91,7 @@ void AnkiConnect::checkConnection(std::function<void(bool, int)> callback)
 
 void AnkiConnect::getDeckNames(std::function<void(bool, const QStringList&)> callback)
 {
-    sendRequest("deckNames", 6, QJsonObject(), [callback](const QJsonValue& result, const QString& error) {
+    sendRequest("deckNames", kAnkiApiVersion, QJsonObject(), [callback](const QJsonValue& result, const QString& error) {
         if (!error.isEmpty() || !result.isArray()) {
             callback(false, QStringList());
             return;
@@ -107,7 +111,7 @@ void AnkiConnect::getDeckNames(std::function<void(bool, const QStringList&)> cal
 
 void AnkiConnect::getModelNames(std::function<void(bool, const QStringList&)> callback)
 {
-    sendRequest("modelNames", 6, QJsonObject(), [callback](const QJsonValue& result, const QString& error) {
+    sendRequest("modelNames", kAnkiApiVersion, QJsonObject(), [callback](const QJsonValue& result, const QString& error) {
         if (!error.isEmpty() || !result.isArray()) {
             callback(false, QStringList());
             return;
@@ -124,9 +128,32 @@ void AnkiConnect::getModelNames(std::function<void(bool, const QStringList&)> ca
     });
 }
 
+void AnkiConnect::getModelFieldNames(const QString& modelName, std::function<void(bool, const QStringList&, const QString&)> callback)
+{
+    QJsonObject params;
+    params["modelName"] = modelName;
+
+    sendRequest("modelFieldNames", kAnkiApiVersion, params, [callback](const QJsonValue& result, const QString& error) {
+        if (!error.isEmpty() || !result.isArray()) {
+            callback(false, QStringList(), error.isEmpty() ? "获取字段失败" : error);
+            return;
+        }
+
+        QStringList fields;
+        QJsonArray arr = result.toArray();
+        for (const QJsonValue& v : arr) {
+            if (v.isString()) {
+                fields.append(v.toString());
+            }
+        }
+        callback(true, fields, QString());
+    });
+}
+
 void AnkiConnect::addNote(const QString& deckName, const QString& modelName, 
                           const QString& frontField, const QString& frontContent, 
                           const QString& backField, const QString& backContent, 
+                          const QStringList& tags,
                           std::function<void(bool, const QString&)> callback)
 {
     // 组装 JSON params (参考 addNote api 的 params.note...)
@@ -135,18 +162,36 @@ void AnkiConnect::addNote(const QString& deckName, const QString& modelName,
     noteObj["modelName"] = modelName;
 
     QJsonObject fieldsObj;
-    fieldsObj[frontField] = frontContent;
-    fieldsObj[backField] = backContent;
+    fieldsObj[frontField.trimmed()] = frontContent;
+    fieldsObj[backField.trimmed()] = backContent;
     noteObj["fields"] = fieldsObj;
 
     QJsonArray tagsArr;
-    tagsArr.append("QtTex_Gen_自动录入");
+    if (tags.isEmpty()) {
+        tagsArr.append("QtTex_Gen_自动录入");
+    } else {
+        for (const QString& tag : tags) {
+            QString t = tag.trimmed();
+            if (!t.isEmpty()) {
+                tagsArr.append(t);
+            }
+        }
+        if (tagsArr.isEmpty()) {
+            tagsArr.append("QtTex_Gen_自动录入");
+        }
+    }
     noteObj["tags"] = tagsArr;
 
     QJsonObject paramsObj;
     paramsObj["note"] = noteObj;
 
-    sendRequest("addNote", 6, paramsObj, [callback](const QJsonValue& result, const QString& error) {
+    // --- 调试：将即将发送的 param 打印出来发给 QML ---
+    QByteArray dbgData = QJsonDocument(paramsObj).toJson(QJsonDocument::Indented);
+    qDebug().noquote() << "Sending addNote JSON:" << dbgData;
+    // 如果想要抛给 QML，由于我们没在这里暴露出独立信号，可以直接使用回调把这个传回去做记录
+    // 稍后在 Controller 处理。如果你想在控制台看，qDebug 就可以看到了。
+    
+    sendRequest("addNote", kAnkiApiVersion, paramsObj, [callback](const QJsonValue& result, const QString& error) {
         if (!error.isEmpty()) {
             callback(false, error); // 失败，带上回传的错误消息 (比如牌组不存在)
         } else if (result.isNull()) {

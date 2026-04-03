@@ -1,6 +1,10 @@
 #include "LatexConverter.h"
 #include <QRegularExpression>
-#include <QRegularExpressionMatch>
+
+// 1. 让正则匹配任意填空 {{c1::...}} ，不再强求里面必须有 $
+// 2. 修复 plain text 中出现 }|] 时被误替换成 } } 的问题
+// 3. 优化对数学公式的处理，允许公式中有 $ 符号，但转义特殊字符
+// 4. 处理类似 {$foo bar$} 的情形
 
 QString CLatexConverter::convertToAnkiLatex(const QString& text)
 {
